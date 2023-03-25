@@ -416,6 +416,17 @@ void extendSeedL(std::vector<SeedL> &seeds,
 			)
 {
 
+	// GGGG: std::vector<LSeed> &seeds needs to be allocated using pinned memory usign cudaMallocaHost
+	// but I cannot call cudaMallocaHost in the non-cuda file where extendSeedL is called
+	// so I'm going to create a copy of the vector to handle the moving back and forth from the GPU
+	// then put the final results into the original seeds vector
+	// the new vector uses a custom allocator defined at the top of this file
+	
+	std::vector<LSeed, cuda_allocator<LSeed>> cudaseeds(numAlignments);   // seeds vector using cudaMallocHost
+	std::vector<LSeed, cuda_allocator<LSeed>> cudaseeds_r(numAlignments); // seeds vector using cudaMallocHost
+	copy_to_cuda_vector(seeds, cudaseeds);
+	copy_to_cuda_vector(seeds, cudaseeds_r);
+
 	if(scoreGapExtend(penalties[0]) >= 0){
 
 		cout<<"Error: Logan does not support gap extension penalty >= 0\n";
