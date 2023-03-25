@@ -9,6 +9,45 @@
 using namespace std;
 using namespace chrono;
 
+// GGGG: custom cuda allocator to use cudaMallocHost when allocating a std::vector
+// If we don't allocate the host vector using cudaMallocHost, it creates an illegal memory access when moving data from device to host
+// Given this interally uses cudaMallocHost, the size n of the std::vector must be defined, such as:
+// std::vector<int, cuda_allocator<int>> vec(n)
+template <typename T>
+class cuda_allocator : public std::allocator<T> {
+public:
+  using pointer = typename std::allocator<T>::pointer;
+
+  pointer allocate(std::size_t n) 
+  {
+    void* ptr;
+    cudaError_t err = cudaMallocHost(&ptr, n * sizeof(T));
+  
+    // GGGG: throw an error and stop the computation if the size isn't defined since it'd create an illegal memory access	  	
+    if (err != cudaSuccess)
+    {
+        std::cerr << "ERROR allocating memory on the host (missing size for cuda_allocator): " << cudaGetErrorString(err) << std::endl;
+        throw std::bad_alloc();
+    }  
+    
+    return static_cast<pointer>(ptr);
+  }
+
+  void deallocate(pointer p, std::size_t n) 
+  {
+    cudaFreeHost(p);
+  }
+};
+
+// GGGG: function to copy a standard std::vector into one using cuda_allocator
+template <typename T>
+void copy_to_cuda_vector(const std::vector<T, std::allocator<T>>& src,
+                         std::vector<T, cuda_allocator<T>>& dst)
+{
+  dst.resize(src.size());
+  std::copy(src.begin(), src.end(), dst.begin());
+}
+
 #define cudaErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort = true){
 
