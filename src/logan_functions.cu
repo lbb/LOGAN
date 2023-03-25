@@ -614,8 +614,8 @@ void extendSeedL(std::vector<SeedL> &seeds,
 		//copy seeds on the GPU
 // 		cudaErrchk(cudaMemcpyAsync(seed_d_l[i], &seeds[0]+i*nSequences, dim*sizeof(SeedL), cudaMemcpyHostToDevice, stream_l[i]));
 // 		cudaErrchk(cudaMemcpyAsync(seed_d_r[i], &seeds_r[0]+i*nSequences, dim*sizeof(SeedL), cudaMemcpyHostToDevice, stream_r[i]));
-		cudaErrchk(cudaMemcpyAsync(seed_d_l[i], &cudaseeds[0]+i*nSequences, dim*sizeof(LSeed), cudaMemcpyHostToDevice, stream_l[i]));
-		cudaErrchk(cudaMemcpyAsync(seed_d_r[i], &cudaseeds_r[0]+i*nSequences, dim*sizeof(LSeed), cudaMemcpyHostToDevice, stream_r[i]));
+		cudaErrchk(cudaMemcpyAsync(seed_d_l[i], &cudaseeds[0]+i*nSequences, dim*sizeof(SeedL), cudaMemcpyHostToDevice, stream_l[i]));
+		cudaErrchk(cudaMemcpyAsync(seed_d_r[i], &cudaseeds_r[0]+i*nSequences, dim*sizeof(SeedL), cudaMemcpyHostToDevice, stream_r[i]));
 		//copy offsets on the GPU
 		cudaErrchk(cudaMemcpyAsync(offsetLeftQ_d[i], &offsetLeftQ[i][0], dim*sizeof(int), cudaMemcpyHostToDevice, stream_l[i]));
 		cudaErrchk(cudaMemcpyAsync(offsetLeftT_d[i], &offsetLeftT[i][0], dim*sizeof(int), cudaMemcpyHostToDevice, stream_l[i]));
@@ -659,9 +659,9 @@ void extendSeedL(std::vector<SeedL> &seeds,
 // 		cudaErrchk(cudaMemcpyAsync(scoreRight+i*nSequences, scoreRight_d[i], dim*sizeof(int), cudaMemcpyDeviceToHost, stream_r[i]));
 // 		cudaErrchk(cudaMemcpyAsync(&seeds_r[0]+i*nSequences, seed_d_r[i], dim*sizeof(SeedL), cudaMemcpyDeviceToHost,stream_r[i]));
 		cudaErrchk(cudaMemcpyAsync(scoreLeft+i*nSequences, scoreLeft_d[i], dim*sizeof(int), cudaMemcpyDeviceToHost, stream_l[i]));
-		cudaErrchk(cudaMemcpyAsync(&cudaseeds[0]+i*nSequences, seed_d_l[i], dim*sizeof(LSeed), cudaMemcpyDeviceToHost,stream_l[i]));
+		cudaErrchk(cudaMemcpyAsync(&cudaseeds[0]+i*nSequences, seed_d_l[i], dim*sizeof(SeedL), cudaMemcpyDeviceToHost,stream_l[i]));
 		cudaErrchk(cudaMemcpyAsync(scoreRight+i*nSequences, scoreRight_d[i], dim*sizeof(int), cudaMemcpyDeviceToHost, stream_r[i]));
-		cudaErrchk(cudaMemcpyAsync(&cudaseeds_r[0]+i*nSequences, seed_d_r[i], dim*sizeof(LSeed), cudaMemcpyDeviceToHost,stream_r[i]));
+		cudaErrchk(cudaMemcpyAsync(&cudaseeds_r[0]+i*nSequences, seed_d_r[i], dim*sizeof(SeedL), cudaMemcpyDeviceToHost,stream_r[i]));
 	
 	}
 
