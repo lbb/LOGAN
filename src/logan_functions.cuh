@@ -46,7 +46,8 @@ void extendSeedL(std::vector<SeedL> &seeds,
 			int numAlignments,
 			int ngpus,
 			int n_threads,
-		 	double& duration
+		 	double& duration,
+			double& duration_device
 			);
 
 #endif

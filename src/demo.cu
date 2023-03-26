@@ -43,7 +43,7 @@ std::vector<std::string> split(const std::string &s, char delim)
 
 /* LOGAN's function call */
 void LOGAN(std::vector<std::vector<std::string>> &alignments, int ksize, 
-				int xdrop, int AlignmentsToBePerformed, int ngpus, int maxt, double& devicet)
+				int xdrop, int AlignmentsToBePerformed, int ngpus, int maxt, double& devicet, double& device_total)
 {
 	std::vector<int> 	posV(AlignmentsToBePerformed);
 	std::vector<int> 	posH(AlignmentsToBePerformed);
@@ -102,7 +102,7 @@ void LOGAN(std::vector<std::vector<std::string>> &alignments, int ksize,
 		std::vector<SeedL>::const_iterator last_s  = seeds.begin() + i + numAlignmentsLocal;
 		std::vector<SeedL> seeds_b(first_s, last_s);
 
-		extendSeedL(seeds_b, EXTEND_BOTHL, target_b, query_b, penalties, xdrop, ksize, res, numAlignmentsLocal, ngpus, GPU_THREADS, devicet);
+		extendSeedL(seeds_b, EXTEND_BOTHL, target_b, query_b, penalties, xdrop, ksize, res, numAlignmentsLocal, ngpus, GPU_THREADS, devicet, device_total);
 		free(res);
 	}
 }
@@ -161,11 +161,13 @@ int main(int argc, char **argv)
 	/* Compute pairwise alignments */
 	auto start = NOW;
 	double duration_device = 0.0;
-   	LOGAN(alignments, ksize, xdrop, AlignmentsToBePerformed, ngpus, maxt, duration_device);	
+	double duration_device_incl_cpy = 0.0;
+   	LOGAN(alignments, ksize, xdrop, AlignmentsToBePerformed, ngpus, maxt, duration_device, duration_device_incl_cpy);	
 	auto end = NOW;	
 	std::chrono::duration<double> tot_time = end-start;
 	double duration_tot = tot_time.count();
 
+	std::cout<< "Device execution time (with data transfer):\t"<< duration_device_incl_cpy <<std::endl;
 	std::cout<< "Device execution time (no data transfer):\t"<< duration_device <<std::endl;
 	std::cout<< "Device + host execution time:\t"<< duration_tot <<std::endl;
    	return 0;

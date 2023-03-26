@@ -413,7 +413,8 @@ void extendSeedL(std::vector<SeedL> &seeds,
 			int numAlignments,
 			int ngpus,
 			int n_threads,
-		 	double& devicet
+		 	double& devicet,
+			double& duration_device
 			)
 {
 
@@ -568,7 +569,7 @@ void extendSeedL(std::vector<SeedL> &seeds,
 		duration<double> setup_ithread = end_setup_ithread - start_setup_ithread;
 		pergpustime[MYTHREAD] = setup_ithread.count();
 	}
-
+	auto start_outer_c = NOW;
 #pragma omp parallel for num_threads(ngpus)
 	for(int i = 0; i < ngpus; i++)
 	{
@@ -707,5 +708,8 @@ void extendSeedL(std::vector<SeedL> &seeds,
 	
 	cudaFreeHost(scoreLeft);
 	cudaFreeHost(scoreRight);
+	auto end_outer_c = NOW;
+	duration<double> compute_outer = end_outer_c - start_outer_c;
+	duration_device += compute_outer.count();
 }
 
