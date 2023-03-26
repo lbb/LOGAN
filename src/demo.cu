@@ -43,7 +43,7 @@ std::vector<std::string> split(const std::string &s, char delim)
 
 /* LOGAN's function call */
 void LOGAN(std::vector<std::vector<std::string>> &alignments, int ksize, 
-				int xdrop, int AlignmentsToBePerformed, int ngpus, int maxt)
+				int xdrop, int AlignmentsToBePerformed, int ngpus, int maxt, double& devicet)
 {
 	std::vector<int> 	posV(AlignmentsToBePerformed);
 	std::vector<int> 	posH(AlignmentsToBePerformed);
@@ -102,7 +102,7 @@ void LOGAN(std::vector<std::vector<std::string>> &alignments, int ksize,
 		std::vector<SeedL>::const_iterator last_s  = seeds.begin() + i + numAlignmentsLocal;
 		std::vector<SeedL> seeds_b(first_s, last_s);
 
-		extendSeedL(seeds_b, EXTEND_BOTHL, target_b, query_b, penalties, xdrop, ksize, res, numAlignmentsLocal, ngpus, GPU_THREADS);
+		extendSeedL(seeds_b, EXTEND_BOTHL, target_b, query_b, penalties, xdrop, ksize, res, numAlignmentsLocal, ngpus, GPU_THREADS, devicet);
 		free(res);
 	}
 }
