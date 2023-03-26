@@ -631,17 +631,21 @@ void extendSeedL(std::vector<SeedL> &seeds,
 		extendSeedLGappedXDropOneDirectionGlobal <<<dim, n_threads, n_threads*sizeof(short), stream_r[i]>>> (seed_d_r[i], suffQ_d[i], suffT_d[i], EXTEND_RIGHTL, XDrop, scoreRight_d[i], offsetRightQ_d[i], offsetRightT_d[i], ant_len_right[i], ant_r[i], n_threads);
 		
 	}
+	
+	
 
 #pragma omp parallel for num_threads(ngpus)
 	for(int i = 0; i < ngpus; i++)
 	{
 		cudaSetDevice(i);
 		cudaDeviceSynchronize();
-		auto end_c = NOW;
 	}
+	
+	auto end_c = NOW;
 	
 	duration<double> compute = end_c - start_c;
 	devicet += compute.count();
+	
 
 #pragma omp parallel for num_threads(ngpus)
 	for(int i = 0; i < ngpus; i++)
@@ -657,14 +661,6 @@ void extendSeedL(std::vector<SeedL> &seeds,
 		cudaErrchk(cudaMemcpyAsync(scoreRight+i*nSequences, scoreRight_d[i], dim*sizeof(int), cudaMemcpyDeviceToHost, stream_r[i]));
 		cudaErrchk(cudaMemcpyAsync(&cudaseeds_r[0]+i*nSequences, seed_d_r[i], dim*sizeof(SeedL), cudaMemcpyDeviceToHost,stream_r[i]));
 	
-	}
-
-#pragma omp parallel for num_threads(ngpus)
-	for(int i = 0; i < ngpus; i++)
-	{
-		cudaSetDevice(i);
-		cudaDeviceSynchronize();
-		auto end_c_ithread_3 = NOW;
 	}
 
 	cudaErrchk(cudaPeekAtLastError());
