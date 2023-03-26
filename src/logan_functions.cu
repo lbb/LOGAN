@@ -634,6 +634,7 @@ void extendSeedL(std::vector<SeedL> &seeds,
 		duration<double> compute = end_c - start_c;
 		tduration[i] += compute.count();
 	}
+	cudaDeviceSynchronize();
 
 #pragma omp parallel for num_threads(ngpus)
 	for(int i = 0; i < ngpus; i++)
