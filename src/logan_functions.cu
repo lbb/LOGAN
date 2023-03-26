@@ -615,6 +615,8 @@ void extendSeedL(std::vector<SeedL> &seeds,
 		cudaErrchk(cudaMemcpyAsync(suffT_d[i], suffT[i], totalLengthTSuff[i]*sizeof(char), cudaMemcpyHostToDevice, stream_r[i]));
 	}
 	
+	auto start_c = NOW;
+	
 	//  main kernel execution
 #pragma omp parallel for num_threads(ngpus)
 	for(int i = 0; i < ngpus;i++)
@@ -624,17 +626,22 @@ void extendSeedL(std::vector<SeedL> &seeds,
 		int dim = nSequences;
 		if(i == ngpus-1)
 			dim = nSequencesLast;
-			
-		auto start_c = NOW;
 		
 		extendSeedLGappedXDropOneDirectionGlobal <<<dim, n_threads, n_threads*sizeof(short), stream_l[i]>>> (seed_d_l[i], prefQ_d[i], prefT_d[i], EXTEND_LEFTL, XDrop, scoreLeft_d[i], offsetLeftQ_d[i], offsetLeftT_d[i], ant_len_left[i], ant_l[i], n_threads);
 		extendSeedLGappedXDropOneDirectionGlobal <<<dim, n_threads, n_threads*sizeof(short), stream_r[i]>>> (seed_d_r[i], suffQ_d[i], suffT_d[i], EXTEND_RIGHTL, XDrop, scoreRight_d[i], offsetRightQ_d[i], offsetRightT_d[i], ant_len_right[i], ant_r[i], n_threads);
 		
-		auto end_c = NOW;
-		duration<double> compute = end_c - start_c;
-		tduration[i] += compute.count();
 	}
-	cudaDeviceSynchronize();
+
+#pragma omp parallel for num_threads(ngpus)
+	for(int i = 0; i < ngpus; i++)
+	{
+		cudaSetDevice(i);
+		cudaDeviceSynchronize();
+		auto end_c = NOW;
+	}
+	
+	duration<double> compute = end_c - start_c;
+	devicet += compute.count();
 
 #pragma omp parallel for num_threads(ngpus)
 	for(int i = 0; i < ngpus; i++)
@@ -700,11 +707,6 @@ void extendSeedL(std::vector<SeedL> &seeds,
 		setBeginPositionV(seeds[i], getBeginPositionV(cudaseeds[i]));  // left extension wasn't modified before but now we need to move back to seeds from cudaseeds
 		setEndPositionH(seeds[i], getEndPositionH(cudaseeds_r[i]));    
 		setEndPositionV(seeds[i], getEndPositionV(cudaseeds_r[i]));
-	}
-	
-	for(int i = 0; i < ngpus; i++)
-	{
-		devicet += tduration[i];
 	}
 	
 	cudaFreeHost(scoreLeft);
