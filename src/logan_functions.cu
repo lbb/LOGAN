@@ -412,9 +412,13 @@ void extendSeedL(std::vector<SeedL> &seeds,
 			int *res,
 			int numAlignments,
 			int ngpus,
-			int n_threads
+			int n_threads,
+		 	double& devicet
 			)
 {
+
+	// thread safe timer
+	std::vector<double> tduration(ngpus, 0.0);
 
 	// GGGG: std::vector<SeedL> &seeds needs to be allocated using pinned memory usign cudaMallocaHost
 	// but I cannot call cudaMallocaHost in the non-cuda file where extendSeedL is called
@@ -427,18 +431,18 @@ void extendSeedL(std::vector<SeedL> &seeds,
 	copy_to_cuda_vector(seeds, cudaseeds);
 	copy_to_cuda_vector(seeds, cudaseeds_r);
 
-	if(scoreGapExtend(penalties[0]) >= 0){
+	if(scoreGapExtend(penalties[0]) >= 0)
+	{
 
 		cout<<"Error: Logan does not support gap extension penalty >= 0\n";
 		exit(-1);
 	}
-	if(scoreGapOpen(penalties[0]) >= 0){
+	if(scoreGapOpen(penalties[0]) >= 0)
+	{
 
 		cout<<"Error: Logan does not support gap opening penalty >= 0\n";
 		exit(-1);
 	}
-	//start measuring time
-	auto start_t1 = NOW;
 	
 	#ifdef ADAPTABLE
     	n_threads = (XDrop/WARP_DIM + 1)* WARP_DIM;
@@ -452,28 +456,13 @@ void extendSeedL(std::vector<SeedL> &seeds,
 	// NB nSequences is correlated to the number of GPUs that we have
 	int nSequences = numAlignments/ngpus;
 	int nSequencesLast = nSequences+numAlignments%ngpus;
-
-	//final result of the alignment
-	// int *scoreLeft = (int *)malloc(numAlignments * sizeof(int));
-	// int *scoreRight = (int *)malloc(numAlignments * sizeof(int));
-
+	
 	// GGGG: cudaMallocHost needed to pin memory on host for final result of the alignment
 	int *scoreLeft = NULL;
 	cudaMallocHost((void **) &scoreLeft, numAlignments * sizeof(int));
 
 	int *scoreRight = NULL;
         cudaMallocHost((void **) &scoreRight, numAlignments * sizeof(int));
-    
-    	// GGGG: this is done at the beginning using cudamallochost and custom allocator and not needed anymore here
-	//create two sets of seeds
-	//copy seeds
-	// 	vector<SeedL> seeds_r;
-	// 	vector<SeedL> seeds_l;
-	// 	seeds_r.reserve(numAlignments);
-
-	// 	for (int i=0; i<seeds.size(); i++){
-	// 		seeds_r.push_back(seeds[i]);	
-	// 	}
 
 	//sequences offsets	 		
 	vector<int> offsetLeftQ[MAX_GPUS];
@@ -593,8 +582,8 @@ void extendSeedL(std::vector<SeedL> &seeds,
 		cudaStreamCreateWithFlags(&stream_r[i],cudaStreamNonBlocking);
 		cudaStreamCreateWithFlags(&stream_l[i],cudaStreamNonBlocking);
 		//allocate antidiagonals on the GPU
-        cudaErrchk(cudaMalloc(&ant_l[i], sizeof(short)*ant_len_left[i]*3*dim));
-        cudaErrchk(cudaMalloc(&ant_r[i], sizeof(short)*ant_len_right[i]*3*dim));
+        	cudaErrchk(cudaMalloc(&ant_l[i], sizeof(short)*ant_len_left[i]*3*dim));
+        	cudaErrchk(cudaMalloc(&ant_r[i], sizeof(short)*ant_len_right[i]*3*dim));
 		//allocate offsets on the GPU
 		cudaErrchk(cudaMalloc(&offsetLeftQ_d[i], dim*sizeof(int)));
 		cudaErrchk(cudaMalloc(&offsetLeftT_d[i], dim*sizeof(int)));
@@ -612,8 +601,6 @@ void extendSeedL(std::vector<SeedL> &seeds,
 		cudaErrchk(cudaMalloc(&suffQ_d[i], totalLengthQSuff[i]*sizeof(char)));
 		cudaErrchk(cudaMalloc(&suffT_d[i], totalLengthTSuff[i]*sizeof(char)));
 		//copy seeds on the GPU
-// 		cudaErrchk(cudaMemcpyAsync(seed_d_l[i], &seeds[0]+i*nSequences, dim*sizeof(SeedL), cudaMemcpyHostToDevice, stream_l[i]));
-// 		cudaErrchk(cudaMemcpyAsync(seed_d_r[i], &seeds_r[0]+i*nSequences, dim*sizeof(SeedL), cudaMemcpyHostToDevice, stream_r[i]));
 		cudaErrchk(cudaMemcpyAsync(seed_d_l[i], &cudaseeds[0]+i*nSequences, dim*sizeof(SeedL), cudaMemcpyHostToDevice, stream_l[i]));
 		cudaErrchk(cudaMemcpyAsync(seed_d_r[i], &cudaseeds_r[0]+i*nSequences, dim*sizeof(SeedL), cudaMemcpyHostToDevice, stream_r[i]));
 		//copy offsets on the GPU
@@ -626,10 +613,7 @@ void extendSeedL(std::vector<SeedL> &seeds,
 		cudaErrchk(cudaMemcpyAsync(prefT_d[i], prefT[i], totalLengthTPref[i]*sizeof(char), cudaMemcpyHostToDevice, stream_l[i]));
 		cudaErrchk(cudaMemcpyAsync(suffQ_d[i], suffQ[i], totalLengthQSuff[i]*sizeof(char), cudaMemcpyHostToDevice, stream_r[i]));
 		cudaErrchk(cudaMemcpyAsync(suffT_d[i], suffT[i], totalLengthTSuff[i]*sizeof(char), cudaMemcpyHostToDevice, stream_r[i]));
-		//OK
 	}
-	
-	auto start_c = NOW;
 	
 	//  main kernel execution
 #pragma omp parallel for num_threads(ngpus)
@@ -640,9 +624,15 @@ void extendSeedL(std::vector<SeedL> &seeds,
 		int dim = nSequences;
 		if(i == ngpus-1)
 			dim = nSequencesLast;
+			
+		auto start_f = NOW;
 		
 		extendSeedLGappedXDropOneDirectionGlobal <<<dim, n_threads, n_threads*sizeof(short), stream_l[i]>>> (seed_d_l[i], prefQ_d[i], prefT_d[i], EXTEND_LEFTL, XDrop, scoreLeft_d[i], offsetLeftQ_d[i], offsetLeftT_d[i], ant_len_left[i], ant_l[i], n_threads);
 		extendSeedLGappedXDropOneDirectionGlobal <<<dim, n_threads, n_threads*sizeof(short), stream_r[i]>>> (seed_d_r[i], suffQ_d[i], suffT_d[i], EXTEND_RIGHTL, XDrop, scoreRight_d[i], offsetRightQ_d[i], offsetRightT_d[i], ant_len_right[i], ant_r[i], n_threads);
+		
+		auto end_c = NOW;
+		duration<double> compute = end_c - start_c;
+		tduration[i] += compute.count();
 	}
 
 #pragma omp parallel for num_threads(ngpus)
@@ -654,10 +644,6 @@ void extendSeedL(std::vector<SeedL> &seeds,
 		if(i == ngpus-1)
 			dim = nSequencesLast;
 			
-// 		cudaErrchk(cudaMemcpyAsync(scoreLeft+i*nSequences, scoreLeft_d[i], dim*sizeof(int), cudaMemcpyDeviceToHost, stream_l[i]));
-// 		cudaErrchk(cudaMemcpyAsync(&seeds[0]+i*nSequences, seed_d_l[i], dim*sizeof(SeedL), cudaMemcpyDeviceToHost,stream_l[i]));
-// 		cudaErrchk(cudaMemcpyAsync(scoreRight+i*nSequences, scoreRight_d[i], dim*sizeof(int), cudaMemcpyDeviceToHost, stream_r[i]));
-// 		cudaErrchk(cudaMemcpyAsync(&seeds_r[0]+i*nSequences, seed_d_r[i], dim*sizeof(SeedL), cudaMemcpyDeviceToHost,stream_r[i]));
 		cudaErrchk(cudaMemcpyAsync(scoreLeft+i*nSequences, scoreLeft_d[i], dim*sizeof(int), cudaMemcpyDeviceToHost, stream_l[i]));
 		cudaErrchk(cudaMemcpyAsync(&cudaseeds[0]+i*nSequences, seed_d_l[i], dim*sizeof(SeedL), cudaMemcpyDeviceToHost,stream_l[i]));
 		cudaErrchk(cudaMemcpyAsync(scoreRight+i*nSequences, scoreRight_d[i], dim*sizeof(int), cudaMemcpyDeviceToHost, stream_r[i]));
@@ -673,13 +659,7 @@ void extendSeedL(std::vector<SeedL> &seeds,
 		auto end_c_ithread_3 = NOW;
 	}
 
-	auto end_c = NOW;
-// 	duration<double> compute = end_c-start_c;
-// 	std::cout << "GPU only time:\t\t" << compute.count() << std::endl;
-
 	cudaErrchk(cudaPeekAtLastError());
-
-	auto start_f = NOW;
 
 #pragma omp parallel for num_threads(ngpus)
 	for(int i = 0; i < ngpus; i++)
@@ -715,16 +695,17 @@ void extendSeedL(std::vector<SeedL> &seeds,
 	{
 		res[i] = scoreLeft[i] + scoreRight[i] + kmer_length;
 		
-// 		setEndPositionH(seeds[i], getEndPositionH(seeds_r[i]));    
-// 		setEndPositionV(seeds[i], getEndPositionV(seeds_r[i])); 
 		setBeginPositionH(seeds[i], getBeginPositionH(cudaseeds[i]));  // left extension wasn't modified before but now we need to move back to seeds from cudaseeds
 		setBeginPositionV(seeds[i], getBeginPositionV(cudaseeds[i]));  // left extension wasn't modified before but now we need to move back to seeds from cudaseeds
 		setEndPositionH(seeds[i], getEndPositionH(cudaseeds_r[i]));    
 		setEndPositionV(seeds[i], getEndPositionV(cudaseeds_r[i]));
 	}
 	
-// 	free(scoreLeft);
-// 	free(scoreRight);
+	for(int i = 0; i < ngpus; i++)
+	{
+		devicet += tduration[i];
+	}
+	
 	cudaFreeHost(scoreLeft);
 	cudaFreeHost(scoreRight);
 }
