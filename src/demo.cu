@@ -160,7 +160,7 @@ int main(int argc, char **argv)
 
 	/* Compute pairwise alignments */
 	auto start = NOW;
-	double duration_device;
+	double duration_device = 0.0;
    	LOGAN(alignments, ksize, xdrop, AlignmentsToBePerformed, ngpus, maxt, duration_device);	
 	auto end = NOW;	
 	std::chrono::duration<double> tot_time = end-start;
