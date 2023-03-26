@@ -160,13 +160,14 @@ int main(int argc, char **argv)
 
 	/* Compute pairwise alignments */
 	auto start = NOW;
-   	LOGAN(alignments, ksize, xdrop, AlignmentsToBePerformed, ngpus, maxt);	
+	double duration_device;
+   	LOGAN(alignments, ksize, xdrop, AlignmentsToBePerformed, ngpus, maxt, duration_device);	
 	auto end = NOW;	
 	std::chrono::duration<double> tot_time = end-start;
 	double duration_tot = tot_time.count();
 
-
-	std::cout<< "Total Execution time:\t"<< duration_tot <<std::endl;
+	std::cout<< "Device execution time (no data transfer):\t"<< duration_device <<std::endl;
+	std::cout<< "Device + host execution time:\t"<< duration_tot <<std::endl;
    	return 0;
 }
 
